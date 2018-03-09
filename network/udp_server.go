@@ -5,15 +5,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ciaos/leaf/kcp"
 	"github.com/ciaos/leaf/log"
 )
 
-type TCPServer struct {
+type UDPServer struct {
 	Addr            string
 	MaxConnNum      int
 	PendingWriteNum int
-	NewAgent        func(*TCPConn) Agent
-	ln              net.Listener
+	NewAgent        func(*UDPConn) Agent
+	ln              *kcp.Listener
 	conns           ConnSet
 	mutexConns      sync.Mutex
 	wgLn            sync.WaitGroup
@@ -24,16 +25,16 @@ type TCPServer struct {
 	MinMsgLen    uint32
 	MaxMsgLen    uint32
 	LittleEndian bool
-	msgParser    *MsgParser
+	msgParser    *UDPMsgParser
 }
 
-func (server *TCPServer) Start() {
+func (server *UDPServer) Start() {
 	server.init()
 	go server.run()
 }
 
-func (server *TCPServer) init() {
-	ln, err := net.Listen("tcp", server.Addr)
+func (server *UDPServer) init() {
+	ln, err := kcp.Listen(kcp.MODE_NORMAL, server.Addr)
 	if err != nil {
 		log.Fatal("%v", err)
 	}
@@ -54,13 +55,13 @@ func (server *TCPServer) init() {
 	server.conns = make(ConnSet)
 
 	// msg parser
-	msgParser := NewMsgParser()
+	msgParser := NewUDPMsgParser()
 	msgParser.SetMsgLen(server.LenMsgLen, server.MinMsgLen, server.MaxMsgLen)
 	msgParser.SetByteOrder(server.LittleEndian)
 	server.msgParser = msgParser
 }
 
-func (server *TCPServer) run() {
+func (server *UDPServer) run() {
 	server.wgLn.Add(1)
 	defer server.wgLn.Done()
 
@@ -97,13 +98,13 @@ func (server *TCPServer) run() {
 
 		server.wgConns.Add(1)
 
-		tcpConn := newTCPConn(conn, server.PendingWriteNum, server.msgParser)
-		agent := server.NewAgent(tcpConn)
+		udpConn := newUDPConn(conn, server.PendingWriteNum, server.msgParser)
+		agent := server.NewAgent(udpConn)
 		go func() {
 			agent.Run()
 
 			// cleanup
-			tcpConn.Close()
+			udpConn.Close()
 			server.mutexConns.Lock()
 			delete(server.conns, conn)
 			server.mutexConns.Unlock()
@@ -114,7 +115,7 @@ func (server *TCPServer) run() {
 	}
 }
 
-func (server *TCPServer) Close() {
+func (server *UDPServer) Close() {
 	server.ln.Close()
 	server.wgLn.Wait()
 

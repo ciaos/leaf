@@ -1,12 +1,13 @@
 package gate
 
 import (
-	"github.com/name5566/leaf/chanrpc"
-	"github.com/name5566/leaf/log"
-	"github.com/name5566/leaf/network"
 	"net"
 	"reflect"
 	"time"
+
+	"github.com/ciaos/leaf/chanrpc"
+	"github.com/ciaos/leaf/log"
+	"github.com/ciaos/leaf/network"
 )
 
 type Gate struct {
@@ -24,6 +25,7 @@ type Gate struct {
 
 	// tcp
 	TCPAddr      string
+	UDPAddr      string
 	LenMsgLen    int
 	LittleEndian bool
 }
@@ -46,6 +48,7 @@ func (gate *Gate) Run(closeSig chan bool) {
 			}
 			return a
 		}
+		log.Debug("start websocket server on %v", gate.WSAddr)
 	}
 
 	var tcpServer *network.TCPServer
@@ -64,6 +67,26 @@ func (gate *Gate) Run(closeSig chan bool) {
 			}
 			return a
 		}
+		log.Debug("start tcp server on %v", gate.TCPAddr)
+	}
+
+	var udpServer *network.UDPServer
+	if gate.UDPAddr != "" {
+		udpServer = new(network.UDPServer)
+		udpServer.Addr = gate.UDPAddr
+		udpServer.MaxConnNum = gate.MaxConnNum
+		udpServer.PendingWriteNum = gate.PendingWriteNum
+		udpServer.LenMsgLen = gate.LenMsgLen
+		udpServer.MaxMsgLen = gate.MaxMsgLen
+		udpServer.LittleEndian = gate.LittleEndian
+		udpServer.NewAgent = func(conn *network.UDPConn) network.Agent {
+			a := &agent{conn: conn, gate: gate}
+			if gate.AgentChanRPC != nil {
+				gate.AgentChanRPC.Go("NewAgent", a)
+			}
+			return a
+		}
+		log.Debug("start kcp server on %v", gate.UDPAddr)
 	}
 
 	if wsServer != nil {
@@ -72,12 +95,20 @@ func (gate *Gate) Run(closeSig chan bool) {
 	if tcpServer != nil {
 		tcpServer.Start()
 	}
+	if udpServer != nil {
+		udpServer.Start()
+	}
+
 	<-closeSig
+
 	if wsServer != nil {
 		wsServer.Close()
 	}
 	if tcpServer != nil {
 		tcpServer.Close()
+	}
+	if udpServer != nil {
+		udpServer.Close()
 	}
 }
 
