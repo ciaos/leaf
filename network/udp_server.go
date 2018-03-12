@@ -34,7 +34,7 @@ func (server *UDPServer) Start() {
 }
 
 func (server *UDPServer) init() {
-	ln, err := kcp.Listen(kcp.MODE_NORMAL, server.Addr)
+	ln, err := kcp.Listen(kcp.MODE_FAST, server.Addr)
 	if err != nil {
 		log.Fatal("%v", err)
 	}
