@@ -3,7 +3,9 @@ package kcp
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/binary"
 	"errors"
+	"hash/crc32"
 	"log"
 	"math/rand"
 	"net"
@@ -27,6 +29,8 @@ const (
 	MAX_PORT         = 65535
 	DEFAULT_WND_SIZE = 128
 	XOR_TABLE_SIZE   = 16384
+
+	CONNECT_PACK_SIZE = 4
 )
 
 type (
@@ -259,6 +263,7 @@ func (s *UDPSession) read_loop() {
 			s.need_update = true
 			s.mu.Unlock()
 			s.read_event()
+		} else if err == nil && n == CONNECT_PACK_SIZE {
 		} else if err, ok := err.(*net.OpError); ok && err.Timeout() {
 		} else {
 			return
@@ -300,10 +305,7 @@ func (l *Listener) monitor() {
 			}
 			addr := from.String()
 			s, ok := l.sessions[addr]
-			if !ok {
-				var conv uint32
-				ikcp_decode32u(data, &conv) // conversation id
-				s := newUDPSession(conv, l.mode, l, conn, from, l.xor_tbl)
+			if ok {
 				ch_feed <- func() {
 					s.mu.Lock()
 					s.kcp.Input(data)
@@ -311,16 +313,22 @@ func (l *Listener) monitor() {
 					s.mu.Unlock()
 					s.read_event()
 				}
+			}
+		} else if err == nil && n == CONNECT_PACK_SIZE {
+			data := make([]byte, n)
+
+			addr := from.String()
+			_, ok := l.sessions[addr]
+			if !ok {
+				conv := crc32.ChecksumIEEE([]byte(addr))
+
+				s := newUDPSession(conv, l.mode, l, conn, from, l.xor_tbl)
+				ikcp_encode32u(data, conv)
+				binary.LittleEndian.PutUint32(data, conv)
+				conn.WriteToUDP(data, from)
+				conn.WriteToUDP(data, from)
 				l.sessions[addr] = s
 				l.ch_accepts <- s
-			} else {
-				ch_feed <- func() {
-					s.mu.Lock()
-					s.kcp.Input(data)
-					s.need_update = true
-					s.mu.Unlock()
-					s.read_event()
-				}
 			}
 		}
 
@@ -430,21 +438,29 @@ func DialEncrypted(mode Mode, raddr string, key string) (*UDPSession, error) {
 	for {
 		port := BASE_PORT + rand.Int()%(MAX_PORT-BASE_PORT)
 		if udpconn, err := net.ListenUDP("udp", &net.UDPAddr{Port: port}); err == nil {
-			var xor_tbl []byte
-			if key != "" {
-				pass := make([]byte, aes.BlockSize)
-				copy(pass, []byte(key))
-				if block, err := aes.NewCipher(pass); err == nil {
-					xor_tbl = make([]byte, XOR_TABLE_SIZE)
-					stream := cipher.NewOFB(block, IV)
-					stream.XORKeyStream(xor_tbl, xor_tbl)
-				} else {
-					log.Println(err)
-				}
 
+			udpconn.WriteToUDP([]byte{0, 0, 0, 0}, udpaddr)
+			udpconn.WriteToUDP([]byte{0, 0, 0, 0}, udpaddr)
+			connectbuf := make([]byte, 24)
+			if n, _, err := udpconn.ReadFromUDP(connectbuf); err == nil && n == CONNECT_PACK_SIZE {
+
+				var conv uint32
+				ikcp_decode32u(connectbuf, &conv)
+				var xor_tbl []byte
+				if key != "" {
+					pass := make([]byte, aes.BlockSize)
+					copy(pass, []byte(key))
+					if block, err := aes.NewCipher(pass); err == nil {
+						xor_tbl = make([]byte, XOR_TABLE_SIZE)
+						stream := cipher.NewOFB(block, IV)
+						stream.XORKeyStream(xor_tbl, xor_tbl)
+					} else {
+						log.Println(err)
+					}
+				}
+				sess := newUDPSession(conv, mode, nil, udpconn, udpaddr, xor_tbl)
+				return sess, nil
 			}
-			sess := newUDPSession(rand.Uint32(), mode, nil, udpconn, udpaddr, xor_tbl)
-			return sess, nil
 		}
 	}
 }
