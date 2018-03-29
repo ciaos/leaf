@@ -10,7 +10,7 @@ var (
 
 	// console
 	ConsolePort   int
-	ConsolePrompt string = "Rose# "
+	ConsolePrompt string = "# "
 	ProfilePath   string
 
 	// cluster
