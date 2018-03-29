@@ -327,6 +327,7 @@ func (l *Listener) monitor() {
 				binary.LittleEndian.PutUint32(data, conv)
 				conn.WriteToUDP(data, from)
 				conn.WriteToUDP(data, from)
+
 				l.sessions[addr] = s
 				l.ch_accepts <- s
 			}
