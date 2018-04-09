@@ -16,6 +16,8 @@ var commands = []Command{
 	new(CommandHelp),
 	new(CommandCPUProf),
 	new(CommandProf),
+	new(CommandTcpConn),
+	new(CommandUdpConn),
 }
 
 type Command interface {
@@ -213,4 +215,42 @@ func (c *CommandProf) run(args []string) string {
 	}
 
 	return fn
+}
+
+// tcpconn
+type CommandTcpConn struct{}
+
+func (c *CommandTcpConn) name() string {
+	return "tcp"
+}
+
+func (c *CommandTcpConn) help() string {
+	return "tcp connection count"
+}
+
+func (c *CommandTcpConn) usage() string {
+	return "\r\n"
+}
+
+func (c *CommandTcpConn) run(args []string) string {
+	return fmt.Sprintf("tcp connection count %v", conf.TcpConnCnt)
+}
+
+// udpconn
+type CommandUdpConn struct{}
+
+func (c *CommandUdpConn) name() string {
+	return "udp"
+}
+
+func (c *CommandUdpConn) help() string {
+	return "udp connection count"
+}
+
+func (c *CommandUdpConn) usage() string {
+	return "\r\n"
+}
+
+func (c *CommandUdpConn) run(args []string) string {
+	return fmt.Sprintf("udp connection count %v", conf.UdpConnCnt)
 }

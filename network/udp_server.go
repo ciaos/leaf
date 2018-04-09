@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ciaos/leaf/conf"
 	"github.com/ciaos/leaf/kcp"
 	"github.com/ciaos/leaf/log"
 )
@@ -14,8 +15,8 @@ type UDPServer struct {
 	MaxConnNum      int
 	PendingWriteNum int
 	NewAgent        func(*UDPConn) Agent
-	ln              *kcp.Listener
-	conns           ConnSet
+	ln              net.Listener
+	conns           UDPConnSet
 	mutexConns      sync.Mutex
 	wgLn            sync.WaitGroup
 	wgConns         sync.WaitGroup
@@ -34,7 +35,7 @@ func (server *UDPServer) Start() {
 }
 
 func (server *UDPServer) init() {
-	ln, err := kcp.Listen(kcp.MODE_FAST, server.Addr)
+	ln, err := kcp.Listen(server.Addr)
 	if err != nil {
 		log.Fatal("%v", err)
 	}
@@ -52,7 +53,7 @@ func (server *UDPServer) init() {
 	}
 
 	server.ln = ln
-	server.conns = make(ConnSet)
+	server.conns = make(UDPConnSet)
 
 	// msg parser
 	msgParser := NewUDPMsgParser()
@@ -94,6 +95,7 @@ func (server *UDPServer) run() {
 			continue
 		}
 		server.conns[conn] = struct{}{}
+		conf.UdpConnCnt = len(server.conns)
 		server.mutexConns.Unlock()
 
 		server.wgConns.Add(1)
@@ -107,6 +109,7 @@ func (server *UDPServer) run() {
 			udpConn.Close()
 			server.mutexConns.Lock()
 			delete(server.conns, conn)
+			conf.UdpConnCnt = len(server.conns)
 			server.mutexConns.Unlock()
 			agent.OnClose()
 

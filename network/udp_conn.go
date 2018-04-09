@@ -4,21 +4,20 @@ import (
 	"net"
 	"sync"
 
-	"github.com/ciaos/leaf/kcp"
 	"github.com/ciaos/leaf/log"
 )
 
-type UDPConnSet map[*kcp.UDPSession]struct{}
+type UDPConnSet map[net.Conn]struct{}
 
 type UDPConn struct {
 	sync.Mutex
-	conn      *kcp.UDPSession
+	conn      net.Conn
 	writeChan chan []byte
 	closeFlag bool
 	msgParser *UDPMsgParser
 }
 
-func newUDPConn(conn *kcp.UDPSession, pendingWriteNum int, msgParser *UDPMsgParser) *UDPConn {
+func newUDPConn(conn net.Conn, pendingWriteNum int, msgParser *UDPMsgParser) *UDPConn {
 	udpConn := new(UDPConn)
 	udpConn.conn = conn
 	udpConn.writeChan = make(chan []byte, pendingWriteNum)
@@ -35,7 +34,6 @@ func newUDPConn(conn *kcp.UDPSession, pendingWriteNum int, msgParser *UDPMsgPars
 				break
 			}
 		}
-
 		conn.Close()
 		udpConn.Lock()
 		udpConn.closeFlag = true
@@ -68,8 +66,9 @@ func (udpConn *UDPConn) Close() {
 		return
 	}
 
-	udpConn.doWrite(nil)
-	udpConn.closeFlag = true
+	udpConn.doDestroy()
+	//udpConn.doWrite(nil)
+	//udpConn.closeFlag = true
 }
 
 func (udpConn *UDPConn) doWrite(b []byte) {

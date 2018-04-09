@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ciaos/leaf/conf"
 	"github.com/ciaos/leaf/log"
 )
 
@@ -93,6 +94,7 @@ func (server *TCPServer) run() {
 			continue
 		}
 		server.conns[conn] = struct{}{}
+		conf.TcpConnCnt = len(server.conns)
 		server.mutexConns.Unlock()
 
 		server.wgConns.Add(1)
@@ -106,6 +108,7 @@ func (server *TCPServer) run() {
 			tcpConn.Close()
 			server.mutexConns.Lock()
 			delete(server.conns, conn)
+			conf.TcpConnCnt = len(server.conns)
 			server.mutexConns.Unlock()
 			agent.OnClose()
 
