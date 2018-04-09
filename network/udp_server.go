@@ -95,7 +95,7 @@ func (server *UDPServer) run() {
 			continue
 		}
 		server.conns[conn] = struct{}{}
-		conf.UdpConnCnt = len(server.conns)
+		conf.UdpConnCnt += 1
 		server.mutexConns.Unlock()
 
 		server.wgConns.Add(1)
@@ -109,7 +109,7 @@ func (server *UDPServer) run() {
 			udpConn.Close()
 			server.mutexConns.Lock()
 			delete(server.conns, conn)
-			conf.UdpConnCnt = len(server.conns)
+			conf.UdpConnCnt -= 1
 			server.mutexConns.Unlock()
 			agent.OnClose()
 

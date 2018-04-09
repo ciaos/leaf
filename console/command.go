@@ -233,7 +233,7 @@ func (c *CommandTcpConn) usage() string {
 }
 
 func (c *CommandTcpConn) run(args []string) string {
-	return fmt.Sprintf("tcp connection count %v", conf.TcpConnCnt)
+	return fmt.Sprintf("tcp connection count %v", conf.TcpConnCnt-1)
 }
 
 // udpconn
