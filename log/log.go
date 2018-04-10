@@ -34,6 +34,14 @@ type Logger struct {
 	fileName   string
 }
 
+func checkFileIsExist(filename string) bool {
+	var exist = true
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		exist = false
+	}
+	return exist
+}
+
 func New(strLevel string, pathname string, flag int) (*Logger, error) {
 	// level
 	var level int
@@ -62,11 +70,19 @@ func New(strLevel string, pathname string, flag int) (*Logger, error) {
 			now.Month(),
 			now.Day())
 
-		file, err := os.Create(path.Join(pathname, filename))
-		if err != nil {
-			return nil, err
+		var file *os.File
+		var err error
+		if checkFileIsExist(path.Join(pathname, filename)) {
+			file, err = os.OpenFile(path.Join(pathname, filename), os.O_APPEND, 0666)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			file, err = os.Create(path.Join(pathname, filename))
+			if err != nil {
+				return nil, err
+			}
 		}
-
 		baseLogger = log.New(file, "", flag)
 		baseFile = file
 	} else {
