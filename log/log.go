@@ -8,6 +8,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/ciaos/leaf/conf"
 )
 
 // levels
@@ -29,6 +31,7 @@ type Logger struct {
 	level      int
 	baseLogger *log.Logger
 	baseFile   *os.File
+	fileName   string
 }
 
 func New(strLevel string, pathname string, flag int) (*Logger, error) {
@@ -50,16 +53,14 @@ func New(strLevel string, pathname string, flag int) (*Logger, error) {
 	// logger
 	var baseLogger *log.Logger
 	var baseFile *os.File
+	var filename string
 	if pathname != "" {
 		now := time.Now()
 
-		filename := fmt.Sprintf("%d%02d%02d_%02d_%02d_%02d.log",
+		filename = fmt.Sprintf("%d_%02d_%02d.log",
 			now.Year(),
 			now.Month(),
-			now.Day(),
-			now.Hour(),
-			now.Minute(),
-			now.Second())
+			now.Day())
 
 		file, err := os.Create(path.Join(pathname, filename))
 		if err != nil {
@@ -77,6 +78,7 @@ func New(strLevel string, pathname string, flag int) (*Logger, error) {
 	logger.level = level
 	logger.baseLogger = baseLogger
 	logger.baseFile = baseFile
+	logger.fileName = filename
 
 	return logger, nil
 }
@@ -96,7 +98,8 @@ func (logger *Logger) doPrintf(level int, printLevel string, format string, a ..
 		return
 	}
 	if logger.baseLogger == nil {
-		panic("logger closed")
+		//panic("logger closed")
+		return
 	}
 
 	format = printLevel + format
@@ -150,4 +153,22 @@ func Fatal(format string, a ...interface{}) {
 
 func Close() {
 	gLogger.Close()
+}
+
+func Rotate(now time.Time) {
+	nowname := fmt.Sprintf("%d_%02d_%02d.log",
+		now.Year(),
+		now.Month(),
+		now.Day())
+
+	if strings.Compare(nowname, gLogger.fileName) != 0 {
+		if conf.LogPath != "" {
+			gLogger.Close()
+			newlogger, err := New(conf.LogLevel, conf.LogPath, conf.LogFlag)
+			if err != nil {
+				panic(err)
+			}
+			Export(newlogger)
+		}
+	}
 }
