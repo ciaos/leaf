@@ -757,6 +757,9 @@ func (l *Listener) monitor() {
 
 					if !ok { // new session
 						if !blacklist.has(from.String(), conv) && len(l.chAccepts) < cap(l.chAccepts) && len(l.sessions) < 4096 { // do not let new session overwhelm accept queue and connection count
+							if uint32(time.Now().Unix())-conv > 5 {
+								return //need connect between 5 seconds when get conv
+							}
 							ses := newUDPSession(conv, l.dataShards, l.parityShards, l, l.conn, from, l.block)
 							ses.kcpInput(data)
 							l.sessions[key] = ses
@@ -791,7 +794,7 @@ func (l *Listener) receiver(ch chan<- inPacket) {
 				return
 			}
 		} else if err == nil && n == CONNECT_PACK_SIZE {
-			conv := crc32.ChecksumIEEE([]byte(from.String()))
+			conv := uint32(time.Now().Unix())
 			cdata := make([]byte, n)
 			binary.LittleEndian.PutUint32(cdata, conv)
 			l.conn.WriteTo(cdata, from)
