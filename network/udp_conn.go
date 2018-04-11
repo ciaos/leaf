@@ -27,8 +27,11 @@ func newUDPConn(conn net.Conn, pendingWriteNum int, msgParser *UDPMsgParser) *UD
 
 	go func() {
 		for {
+			t := time.NewTimer(time.Duration(conf.UDPTimeOutSec) * time.Second)
+
 			select {
 			case b := <-udpConn.writeChan:
+				t.Stop()
 				if b == nil {
 					goto FOR_END
 				}
@@ -37,7 +40,7 @@ func newUDPConn(conn net.Conn, pendingWriteNum int, msgParser *UDPMsgParser) *UD
 				if err != nil {
 					goto FOR_END
 				}
-			case <-time.After(time.Second * time.Duration(conf.UDPTimeOutSec)):
+			case <-t.C:
 				goto FOR_END
 			}
 		}

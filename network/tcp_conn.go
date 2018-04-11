@@ -27,8 +27,11 @@ func newTCPConn(conn net.Conn, pendingWriteNum int, msgParser *MsgParser) *TCPCo
 
 	go func() {
 		for {
+			t := time.NewTimer(time.Duration(conf.TCPTimeOutSec) * time.Second)
+
 			select {
 			case b := <-tcpConn.writeChan:
+				t.Stop()
 				if b == nil {
 					goto FOR_END
 				}
@@ -37,7 +40,7 @@ func newTCPConn(conn net.Conn, pendingWriteNum int, msgParser *MsgParser) *TCPCo
 				if err != nil {
 					goto FOR_END
 				}
-			case <-time.After(time.Second * time.Duration(conf.TCPTimeOutSec)):
+			case <-t.C:
 				goto FOR_END
 			}
 		}
