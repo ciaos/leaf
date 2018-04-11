@@ -171,20 +171,13 @@ func Close() {
 	gLogger.Close()
 }
 
-func Rotate(now time.Time) {
-	nowname := fmt.Sprintf("%d_%02d_%02d.log",
-		now.Year(),
-		now.Month(),
-		now.Day())
-
-	if strings.Compare(nowname, gLogger.fileName) != 0 {
-		if conf.LogPath != "" {
-			gLogger.Close()
-			newlogger, err := New(conf.LogLevel, conf.LogPath, conf.LogFlag)
-			if err != nil {
-				panic(err)
-			}
-			Export(newlogger)
+func Rotate() {
+	if conf.LogPath != "" {
+		gLogger.Close()
+		newlogger, err := New(conf.LogLevel, conf.LogPath, conf.LogFlag)
+		if err != nil {
+			panic(err)
 		}
+		Export(newlogger)
 	}
 }
