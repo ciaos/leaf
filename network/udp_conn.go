@@ -3,7 +3,9 @@ package network
 import (
 	"net"
 	"sync"
+	"time"
 
+	"github.com/ciaos/leaf/conf"
 	"github.com/ciaos/leaf/log"
 )
 
@@ -24,16 +26,22 @@ func newUDPConn(conn net.Conn, pendingWriteNum int, msgParser *UDPMsgParser) *UD
 	udpConn.msgParser = msgParser
 
 	go func() {
-		for b := range udpConn.writeChan {
-			if b == nil {
-				break
-			}
+		for {
+			select {
+			case b := <-udpConn.writeChan:
+				if b == nil {
+					goto FOR_END
+				}
 
-			_, err := conn.Write(b)
-			if err != nil {
-				break
+				_, err := conn.Write(b)
+				if err != nil {
+					goto FOR_END
+				}
+			case <-time.After(time.Second * time.Duration(conf.UDPTimeOutSec)):
+				goto FOR_END
 			}
 		}
+	FOR_END:
 		conn.Close()
 		udpConn.Lock()
 		udpConn.closeFlag = true

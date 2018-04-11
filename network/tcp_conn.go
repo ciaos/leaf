@@ -3,7 +3,9 @@ package network
 import (
 	"net"
 	"sync"
+	"time"
 
+	"github.com/ciaos/leaf/conf"
 	"github.com/ciaos/leaf/log"
 )
 
@@ -24,17 +26,22 @@ func newTCPConn(conn net.Conn, pendingWriteNum int, msgParser *MsgParser) *TCPCo
 	tcpConn.msgParser = msgParser
 
 	go func() {
-		for b := range tcpConn.writeChan {
-			if b == nil {
-				break
-			}
+		for {
+			select {
+			case b := <-tcpConn.writeChan:
+				if b == nil {
+					goto FOR_END
+				}
 
-			_, err := conn.Write(b)
-			if err != nil {
-				break
+				_, err := conn.Write(b)
+				if err != nil {
+					goto FOR_END
+				}
+			case <-time.After(time.Second * time.Duration(conf.TCPTimeOutSec)):
+				goto FOR_END
 			}
 		}
-
+	FOR_END:
 		conn.Close()
 		tcpConn.Lock()
 		tcpConn.closeFlag = true
