@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"hash/crc32"
+	"math"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -57,10 +58,25 @@ var (
 	xmitBuf sync.Pool
 )
 
+var g_convid uint32
+var g_mu sync.Mutex
+
 func init() {
 	xmitBuf.New = func() interface{} {
 		return make([]byte, mtuLimit)
 	}
+
+	g_convid = 0
+}
+
+func getNewConvID() uint32 {
+	g_mu.Lock()
+	defer g_mu.Unlock()
+	g_convid += 1
+	if g_convid > math.MaxUint32 {
+		g_convid = 0
+	}
+	return g_convid
 }
 
 type (
@@ -791,7 +807,8 @@ func (l *Listener) receiver(ch chan<- inPacket) {
 				return
 			}
 		} else if err == nil && n == CONNECT_PACK_SIZE {
-			conv := crc32.ChecksumIEEE([]byte(from.String()))
+			//conv := crc32.ChecksumIEEE([]byte(from.String()))
+			conv := getNewConvID()
 			cdata := make([]byte, n)
 			binary.LittleEndian.PutUint32(cdata, conv)
 			l.conn.WriteTo(cdata, from)
