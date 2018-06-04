@@ -73,7 +73,7 @@ func New(strLevel string, pathname string, flag int) (*Logger, error) {
 		var file *os.File
 		var err error
 		if checkFileIsExist(path.Join(pathname, filename)) {
-			file, err = os.OpenFile(path.Join(pathname, filename), os.O_APPEND, 0666)
+			file, err = os.OpenFile(path.Join(pathname, filename), os.O_WRONLY|os.O_APPEND, 0666)
 			if err != nil {
 				return nil, err
 			}
